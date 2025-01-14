@@ -16,7 +16,7 @@ from utils import DiceLoss
 
 
 def trainer_synapse(args, model, snapshot_path):
-    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
+    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator, AgroCultureVisionDataset
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -25,9 +25,11 @@ def trainer_synapse(args, model, snapshot_path):
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
-    db_train = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="train",
-                               transform=transforms.Compose(
-                                   [RandomGenerator(output_size=[args.img_size, args.img_size])]))
+
+    db_train = AgroCultureVisionDataset(base_dir=args.root_path, split="train", transform=transforms.Compose([transforms.ToTensor()]))
+    # db_train = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="train",
+    #                            transform=transforms.Compose(
+    #                                [RandomGenerator(output_size=[args.img_size, args.img_size])]))
     db_val = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="val",
                              transform=transforms.Compose(
                                  [RandomGenerator(output_size=[args.img_size, args.img_size])]))

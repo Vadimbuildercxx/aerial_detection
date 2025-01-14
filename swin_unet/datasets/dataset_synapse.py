@@ -80,3 +80,92 @@ class Synapse_dataset(Dataset):
             sample = self.transform(sample)
         sample['case_name'] = self.sample_list[idx].strip('\n')
         return sample
+
+
+from os import listdir
+from os.path import isfile, join
+from PIL import Image
+import matplotlib.pyplot as plt
+
+
+class AgroCultureVisionDataset(Dataset):
+    def __init__(self, base_dir, split, transform=None):
+        self.transform = transform  # using transform in torch!
+
+        self.split = split
+        self.data_dir = base_dir
+        file_folder = os.path.join(base_dir, split)
+
+        images_rgb_path = os.path.join(file_folder ,"images/rgb")
+        images_rgb = [f for f in listdir(images_rgb_path)]
+        self.sample_list = [f.split(".")[0] for f in images_rgb]
+        
+
+    def __len__(self):
+        return len(self.sample_list)
+
+    def __getitem__(self, idx):
+        # if self.split in ["train", "val"] or self.sample_list[idx].strip('\n').split(",")[0].endswith(".npz"):
+        #     slice_name = self.sample_list[idx].strip('\n').split(",")[0]
+        #     if slice_name.endswith(".npz"):
+        #         data_path = os.path.join(self.data_dir, slice_name)
+        #     else:
+        #         data_path = os.path.join(self.data_dir, slice_name + '.npz')
+        #     data = np.load(data_path)
+        #     try:
+        #         image, label = data['image'], data['label']
+        #     except:
+        #         image, label = data['data'], data['seg']
+        # else:
+        #     vol_name = self.sample_list[idx].strip('\n')
+        #     filepath = self.data_dir + "/{}.npy.h5".format(vol_name)
+        #     data = h5py.File(filepath)
+        #     image, label = data['image'][:], data['label'][:]
+        assert self.split in ["train", "val"]
+
+        image, label = self.create_mask(self.data_dir, self.split, idx)
+
+        if self.transform:
+            image = self.transform(image)
+        sample = {'image': image, 'label': label}
+        return sample
+    
+
+    def create_mask(self, dataset_path, partition, idx):
+        name_prefix = self.sample_list[idx]
+
+        file_folder = os.path.join(dataset_path, partition)
+        image_path = os.path.join(file_folder ,"images/rgb", name_prefix + ".jpg")
+        img = np.asarray(Image.open(image_path))
+
+        labels_path = os.path.join(file_folder ,"labels")
+
+        labels_list = [f for f in listdir(labels_path)]
+
+        cmap_fn = self.get_cmap(len(labels_list)+1, "Set3")
+
+        total_mask_color = 0
+        exclude_list = ['double_plant', 'water', 'planter_skip']
+
+        for i, label in enumerate(labels_list):
+            if label not in exclude_list:
+                label_mask_path = os.path.join(file_folder ,"labels", label, name_prefix + ".png")
+                color = cmap_fn(i)
+                img_label_mask = self.read_image(label_mask_path) * np.array(color[:-1])
+                total_mask_color = total_mask_color + img_label_mask
+        total_mask_color[total_mask_color != 0] = 1
+
+        return img, total_mask_color
+    
+    def read_image(self, path):
+        '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct
+        RGB color; the keyword argument name must be a standard mpl colormap name.'''
+        clipped = np.clip(np.asarray(Image.open(path)), a_min = 0.,  a_max=1.)
+        img = np.dstack([clipped]*3)
+        return img
+    
+    def get_cmap(self, n, name='hsv'):
+        '''Returns a function that maps each index in 0, 1, ..., n-1 to a distinct
+        RGB color; the keyword argument name must be a standard mpl colormap name.'''
+        return plt.get_cmap(name, n)
+
